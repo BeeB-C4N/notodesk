@@ -657,6 +657,7 @@
         width: min(65%, 66px);
         min-height: 4px;
         border-radius: 7px 7px 0 0;
+        cursor: default;
       }
 
       .bar-label {
@@ -675,12 +676,11 @@
       }
 
       .legend-item {
-        position: relative;
         display: inline-flex;
         align-items: center;
         gap: 5px;
         color: #728196;
-        cursor: help;
+        cursor: default;
         font-size: 0.62rem;
       }
 
@@ -690,29 +690,6 @@
         height: 10px;
         flex: 0 0 auto;
         border-radius: 50%;
-      }
-
-      .legend-item::after {
-        position: absolute;
-        z-index: 8;
-        bottom: calc(100% + 8px);
-        left: 50%;
-        width: max-content;
-        border-radius: 8px;
-        background: var(--navy);
-        padding: 7px 9px;
-        color: #fff;
-        content: attr(data-tooltip);
-        opacity: 0;
-        pointer-events: none;
-        transform: translate(-50%, 4px);
-        transition: 0.16s ease;
-      }
-
-      .legend-item:hover::after,
-      .legend-item:focus-visible::after {
-        opacity: 1;
-        transform: translate(-50%, 0);
       }
 
       .matrix-scroll {
@@ -783,6 +760,7 @@
         place-items: center;
         overflow: hidden;
         color: rgba(32, 49, 68, 0.9);
+        cursor: default;
         font-size: 0.58rem;
         font-weight: 800;
       }
@@ -807,7 +785,7 @@
 
       .link-cards {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(3, 1fr);
         gap: 14px;
       }
 
@@ -977,15 +955,43 @@
       }
 
       .donut-chart {
-        display: grid;
+        position: relative;
         width: 220px;
         aspect-ratio: 1;
-        place-items: center;
-        border-radius: 50%;
-        background: #edf2f7;
+      }
+
+      .donut-chart svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+        transform: rotate(-90deg);
+      }
+
+      .donut-track,
+      .donut-segment {
+        fill: none;
+        stroke-width: 24;
+      }
+
+      .donut-track {
+        stroke: #edf2f7;
+      }
+
+      .donut-segment {
+        cursor: default;
+        transition: filter 0.18s ease, stroke-width 0.18s ease;
+      }
+
+      .donut-segment:hover {
+        filter: brightness(0.93);
+        stroke-width: 27;
       }
 
       .donut-hole {
+        position: absolute;
+        top: 21%;
+        left: 21%;
         display: grid;
         width: 58%;
         aspect-ratio: 1;
@@ -1041,6 +1047,27 @@
         text-align: right;
       }
 
+      .graph-tooltip {
+        position: fixed;
+        z-index: 120;
+        max-width: min(280px, calc(100vw - 24px));
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 10px;
+        background: rgba(32, 49, 68, 0.96);
+        padding: 8px 11px;
+        color: #fff;
+        box-shadow: 0 10px 26px -14px rgba(15, 30, 45, 0.8);
+        font-size: 0.7rem;
+        font-weight: 700;
+        line-height: 1.45;
+        pointer-events: none;
+        white-space: nowrap;
+      }
+
+      .graph-tooltip[hidden] {
+        display: none;
+      }
+
       .custom-scrollbar::-webkit-scrollbar {
         width: 8px;
         height: 8px;
@@ -1072,6 +1099,10 @@
         .links-inner {
           grid-template-columns: 1fr;
           gap: 28px;
+        }
+
+        .link-cards {
+          grid-template-columns: repeat(2, 1fr);
         }
       }
 
@@ -1555,6 +1586,11 @@
               <strong>能登半島広域観光協会</strong>
               <em aria-hidden="true">↗</em>
             </a>
+
+            <a
+              href="./noto-desk-portal.html"
+              download="noto-desk-portal.html"
+            >
           </div>
         </div>
       </section>
@@ -1625,6 +1661,13 @@
         <div id="donutBody" class="modal-body donut-layout"></div>
       </div>
     </div>
+
+    <div
+      id="graphTooltip"
+      class="graph-tooltip"
+      role="tooltip"
+      hidden
+    ></div>
 
     <script>
       "use strict";
@@ -1703,6 +1746,25 @@
         "教える",
         "欲しい"
       ]);
+
+      const NON_NOUN_PATTERNS = [
+        /する$/,
+        /した$/,
+        /して$/,
+        /できる$/,
+        /ある$/,
+        /いる$/,
+        /ない$/,
+        /たい$/,
+        /れる$/,
+        /られる$/,
+        /かった$/,
+        /くて$/,
+        /ので$/,
+        /から$/,
+        /まで$/,
+        /より$/
+      ];
 
       const state = {
         records: [],
@@ -2044,23 +2106,24 @@
           return Array.from(segmenter.segment(normalizeText(text)))
             .filter((item) => item.isWordLike)
             .map((item) => item.segment)
-            .filter(isUsefulWord);
+            .filter(isNounCandidate);
         }
 
         return (
           normalizeText(text).match(
             /[一-龠々〆ヵヶァ-ヴー]{2,}|[a-z]{3,}/gi
           ) || []
-        ).filter(isUsefulWord);
+        ).filter(isNounCandidate);
       }
 
-      function isUsefulWord(word) {
+      function isNounCandidate(word) {
         return (
           word.length >= 2 &&
           word.length < 18 &&
           !STOP_WORDS.has(word) &&
           !/^[\d０-９]+$/.test(word) &&
-          !/^[a-z]$/i.test(word)
+          !/^[a-z]$/i.test(word) &&
+          !NON_NOUN_PATTERNS.some((pattern) => pattern.test(word))
         );
       }
 
@@ -2503,16 +2566,24 @@
         }
 
         const maximum = categories[0]?.count || 1;
+        const total = categories.reduce(
+          (sum, category) => sum + category.count,
+          0
+        );
 
         container.innerHTML = categories
           .map((category) => {
             const height = Math.max(4, (category.count / maximum) * 100);
+            const percentage = total
+              ? (category.count / total) * 100
+              : 0;
 
             return `
               <div class="vertical-bar-item">
                 <span class="bar-value">${category.count}</span>
                 <div class="vertical-bar-track">
                   <i
+                    data-graph-tooltip="${escapeHtml(category.name)}｜${category.count}件｜${percentage.toFixed(1)}%"
                     style="
                       height: ${height}%;
                       background: ${category.color};
@@ -2535,8 +2606,6 @@
             return `
               <span
                 class="legend-item"
-                data-tooltip="${escapeHtml(category.name)}：${category.count}件"
-                tabindex="0"
               >
                 <i
                   class="legend-dot"
@@ -2566,11 +2635,11 @@
 
                 return `
                   <span
+                    data-graph-tooltip="${escapeHtml(value.genre)}｜${value.count}件｜${value.percentage.toFixed(1)}%"
                     style="
                       width: ${value.percentage}%;
                       background: ${value.color};
                     "
-                    title="${escapeHtml(value.genre)}：${value.count}件（${value.percentage.toFixed(1)}%）"
                   >
                     ${label}
                   </span>
@@ -2602,21 +2671,27 @@
           .join("");
       }
 
-      function donutBackground(values) {
-        if (!values.length) {
-          return "#edf2f7";
-        }
+      function createDonutSegments(values) {
+        let offset = 0;
 
-        let start = 0;
+        return values.map((value) => {
+          const segmentOffset = offset;
+          offset += value.percentage;
 
-        const segments = values.map((value) => {
-          const end = start + value.percentage;
-          const segment = `${value.color} ${start}% ${end}%`;
-          start = end;
-          return segment;
-        });
-
-        return `conic-gradient(${segments.join(", ")})`;
+          return `
+            <circle
+              class="donut-segment"
+              cx="60"
+              cy="60"
+              r="48"
+              pathLength="100"
+              stroke="${value.color}"
+              stroke-dasharray="${value.percentage} ${100 - value.percentage}"
+              stroke-dashoffset="${-segmentOffset}"
+              data-graph-tooltip="${escapeHtml(value.genre)}｜${value.count}件｜${value.percentage.toFixed(1)}%"
+            ></circle>
+          `;
+        }).join("");
       }
 
       function renderMunicipalityModal(monthlyData) {
@@ -2649,10 +2724,19 @@
         document.getElementById("donutBody").innerHTML = `
           <div
             class="donut-chart"
-            style="background: ${donutBackground(values)};"
             role="img"
             aria-label="${escapeHtml(state.selectedMunicipality)}の案内内容内訳"
           >
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle
+                class="donut-track"
+                cx="60"
+                cy="60"
+                r="48"
+                pathLength="100"
+              ></circle>
+              ${createDonutSegments(values)}
+            </svg>
             <div class="donut-hole">
               <strong>${row?.count || 0}</strong>
               <span>案内件数</span>
@@ -2794,6 +2878,36 @@
           }
         });
       });
+
+      document.addEventListener("pointermove", (event) => {
+        const target = event.target.closest?.("[data-graph-tooltip]");
+        const tooltip = document.getElementById("graphTooltip");
+
+        if (!target) {
+          tooltip.hidden = true;
+          return;
+        }
+
+        tooltip.textContent = target.dataset.graphTooltip;
+        tooltip.hidden = false;
+
+        const left = Math.min(
+          event.clientX + 14,
+          window.innerWidth - tooltip.offsetWidth - 12
+        );
+
+        const top = Math.min(
+          event.clientY + 14,
+          window.innerHeight - tooltip.offsetHeight - 12
+        );
+
+        tooltip.style.left = `${Math.max(12, left)}px`;
+        tooltip.style.top = `${Math.max(12, top)}px`;
+      });
+
+      window.addEventListener("scroll", () => {
+        document.getElementById("graphTooltip").hidden = true;
+      }, { passive: true });
 
       document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") {
